@@ -1,0 +1,76 @@
+---
+title: "Flamengo"
+author: "Daniel"
+date: "2023-07-18"
+output: html_document
+---
+
+```{r}
+dados = read.csv("copadobrasil.csv")
+adicionais = readxl::read_excel("dadosadicionais.xlsx")
+colnames(adicionais) = colnames(dados)
+adicionais = adicionais[-1,]
+dados = rbind(dados, adicionais)
+dados  = dados %>%  mutate_all(~ ifelse(. == "NA", 4000, .))
+```
+
+```{r}
+get_matchs_away = function(x, dados){
+  n = nrow(dados)
+  finding = TRUE
+  away_count = 0
+  home_count = 0
+  
+  for(k in n:1){
+    if(finding){
+      if(x == dados[k,4]){
+        finding = FALSE
+        home_count = home_count + 1
+      }
+      if(x == dados[k,3]){
+        finding = FALSE
+        away_count = away_count + 1
+      }
+    }
+    if(!finding){
+      if(x == dados[k,4]){
+        finding = TRUE
+      }
+      if(x == dados[k,3]){
+        finding = TRUE
+      }
+    }
+  }
+  
+  dataresultado = data.frame(casa = home_count, fora = away_count, total = home_count + away_count, stat = home_count/(away_count+home_count))
+  return(dataresultado)
+}
+
+get_matchs_away = Vectorize(get_matchs_away, "x")
+```
+
+```{r}
+get_p_values = function(dados){
+  lista_times = get_matchs_away(unique(dados$home_team)[1:(length(unique(dados$home_team))-8)], dados)
+  lista_times = lista_times |> t() |> as.data.frame()
+  lista_times$casa = as.numeric(lista_times$casa)
+  lista_times$fora = as.numeric(lista_times$fora)
+  lista_times$total = as.numeric(lista_times$total)
+  lista_times$stat = as.numeric(lista_times$stat)
+  lista_times$p_value = 0
+  for(n in 1:nrow(lista_times)){
+    lista_times$p_value[n] = pbinom(lista_times$casa[n], lista_times$total[n],
+                                    0.5, lower.tail = FALSE)
+  }
+  return(lista_times %>% arrange(p_value))
+}
+```
+
+```{r}
+lista_total = get_p_values(dados)
+lista_2019 = get_p_values(dados %>% filter(season > 2017))
+```
+
+
+
+
